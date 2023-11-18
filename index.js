@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 require("dotenv").config();
+const jwt = require('jsonwebtoken');
 const cors = require("cors");
 const port = process.env.PORT || 5000;
 
@@ -30,9 +31,39 @@ async function run() {
     const cartCOllection = client.db("bistroDB").collection("carts");
 
     // uses's api
+    app.get('/users', async(req, res)=>{
+      const result = await userCOllection.find().toArray();
+      res.send(result);
+    })
+
+
     app.post('/users', async(req, res)=>{
       const user = req.body;
+      const query = { email: user.email };
+      const existingUser = await userCOllection.findOne(query);
+      if(existingUser){
+        return res.send({ message: "user already exist", insertedId: null})
+      }
       const result = await userCOllection.insertOne(user);
+      res.send(result);
+    })
+
+    app.patch('/users/admin/:id', async(req, res)=>{
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: 'admin'
+        }
+      }
+      const result = await userCOllection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
+
+    app.delete('/users/:id', async(req, res)=>{
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await userCOllection.deleteOne(query);
       res.send(result);
     })
 
