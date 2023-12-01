@@ -7,6 +7,15 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
 
+const formData = require("form-data");
+const Mailgun = require("mailgun.js");
+const mailgun = new Mailgun(formData);
+
+const mg = mailgun.client({
+  username: "api",
+  key: process.env.MAIL_GUN_API_KEY,
+});
+
 // middleware
 app.use(cors());
 app.use(express.json());
@@ -231,6 +240,29 @@ async function run() {
         },
       };
       const deleteResult = await cartCOllection.deleteMany(query);
+
+      mg.messages
+        .create(process.env.MAIL_SENDING_DOMAIN, {
+          from: "Mailgun Sandbox <postmaster@sandbox1472c37b4f64494b82b60142042a9ac2.mailgun.org>",
+          to: ["hmsmiraz64729@gmail.com"],
+          subject: "Bistro Boss Order Confirmation",
+          text: "Testing some Mailgun awesomness!",
+          html: `
+            <div>
+              <h2>Thank you for your order</h2>
+              <h4>Your Transaction Id: <strong>${payment.transactionId}</strong></h4>
+              <p>We would like to get your feedback about the food</p>
+            </div>
+          `
+        })
+        .then((msg) => console.log(msg)) // logs response data
+        .catch((err) => console.log(err)); // logs any error`;
+
+      // You can see a record of this email in your logs: https://app.mailgun.com/app/logs.
+
+      // You can send up to 300 emails/day from this sandbox server.
+      // Next, you should add your own domain so you can send 10000 emails/month for free.
+
       res.send({ paymentResult, deleteResult });
     });
 
@@ -261,7 +293,7 @@ async function run() {
       });
     });
 
-    app.get("/order-stats",verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/order-stats", verifyToken, verifyAdmin, async (req, res) => {
       const result = await paymentCOllection
         .aggregate([
           {
@@ -282,17 +314,17 @@ async function run() {
             $group: {
               _id: "$menuItems.category",
               quantity: { $sum: 1 },
-              revenue: { $sum: '$menuItems.price'}
+              revenue: { $sum: "$menuItems.price" },
             },
           },
           {
-          $project: {
-            _id: 0,
-            category: '$_id',
-            quantity: '$quantity',
-            revenue: '$revenue'
+            $project: {
+              _id: 0,
+              category: "$_id",
+              quantity: "$quantity",
+              revenue: "$revenue",
+            },
           },
-        }
         ])
         .toArray();
       res.send(result);
